@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SANDAG Trip Generation Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .calculator-card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease-in-out;
+        }
+        .result-card {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-4xl mx-auto">
+        <div class="calculator-card overflow-hidden md:grid md:grid-cols-2 md:gap-0">
+            <!-- Image Section -->
+            <div class="hidden md:block">
+                <img src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=1887&auto=format&fit=crop" 
+                     alt="A scenic road with a classic car, representing travel and trips"
+                     onerror="this.onerror=null;this.src='https://placehold.co/600x800/e0e7ff/4f46e5?text=Trip+Generation';"
+                     class="h-full w-full object-cover">
+            </div>
+
+            <!-- Form Section -->
+            <div class="p-6 md:p-8 flex flex-col justify-center">
+                <div class="text-center mb-8">
+                    <h1 class="text-2xl md:text-3xl font-bold text-gray-800">SANDAG Trip Generation Calculator</h1>
+                    <p class="text-gray-500 mt-2">Estimate vehicle trips based on SANDAG's 2002 generation rates.</p>
+                </div>
+
+                <!-- Form Inputs -->
+                <div class="space-y-6">
+                    <div>
+                        <label for="landUse" class="block text-sm font-medium text-gray-700 mb-1">Land Use Type</label>
+                        <select id="landUse" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="unit" class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                            <select id="unit" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                        </div>
+                        <div>
+                            <label for="size" class="block text-sm font-medium text-gray-700 mb-1">Project Size</label>
+                            <input type="number" id="size" placeholder="e.g., 10" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <button id="calculateBtn" class="w-full btn-primary font-semibold py-3 px-4 rounded-md shadow-sm">
+                            Calculate Trips
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results Display -->
+                <div id="results" class="mt-8 hidden">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Estimated Vehicle Trips</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                        <div class="result-card p-4 rounded-lg">
+                            <p class="text-sm text-gray-500">Daily Trips</p>
+                            <p id="dailyTrips" class="text-2xl font-bold text-indigo-600">-</p>
+                        </div>
+                        <div class="result-card p-4 rounded-lg">
+                            <p class="text-sm text-gray-500">AM Peak Hour</p>
+                            <p id="amTrips" class="text-2xl font-bold text-indigo-600">-</p>
+                        </div>
+                        <div class="result-card p-4 rounded-lg">
+                            <p class="text-sm text-gray-500">PM Peak Hour</p>
+                            <p id="pmTrips" class="text-2xl font-bold text-indigo-600">-</p>
+                        </div>
+                    </div>
+                     <div id="errorMessage" class="mt-4 text-center text-red-600 font-medium"></div>
+                </div>
+            </div>
+        </div>
+        <footer class="text-center mt-4">
+            <p class="text-xs text-gray-400">Data based on "SANDAG's (Not So) Brief Guide of Vehicular Traffic Generation Rates for the San Diego Region - APRIL 2002". This tool is for estimation purposes only.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Data extracted and parsed from the provided CSV file.
+        const tripData = [
+            { category: "AGRICULTURE", subCategory: "Open Space", rates: [{ rate: 2, unit: "acre" }], amPeak: null, pmPeak: null },
+            { category: "AIRPORT", subCategory: "Commercial", rates: [{ rate: 60, unit: "acre" }, { rate: 100, unit: "flight" }, { rate: 70, unit: "1000 sq. ft." }], amPeak: 0.05, pmPeak: 0.06 },
+            { category: "AIRPORT", subCategory: "General Aviation Heliports", rates: [{ rate: 6, unit: "acre" }, { rate: 2, unit: "flight" }, { rate: 6, unit: "based aircraft" }, { rate: 100, unit: "acre" }], amPeak: 0.09, pmPeak: 0.15 },
+            { category: "AUTOMOBILES", subCategory: "Car Wash Automatic", rates: [{ rate: 900, unit: "site" }, { rate: 600, unit: "acre" }], amPeak: 0.04, pmPeak: 0.09 },
+            { category: "AUTOMOBILES", subCategory: "Self-serve Car Wash", rates: [{ rate: 100, unit: "wash stall" }], amPeak: 0.04, pmPeak: 0.08 },
+            { category: "AUTOMOBILES", subCategory: "Gasoline w/Food Mart", rates: [{ rate: 160, unit: "vehicle fueling space" }], amPeak: 0.07, pmPeak: 0.08 },
+            { category: "AUTOMOBILES", subCategory: "Gasoline w/Food Mart & Car Wash", rates: [{ rate: 155, unit: "vehicle fueling space" }], amPeak: 0.08, pmPeak: 0.09 },
+            { category: "AUTOMOBILES", subCategory: "Older Service Station", rates: [{ rate: 150, unit: "vehicle fueling space" }, { rate: 900, unit: "station" }], amPeak: 0.07, pmPeak: 0.09 },
+            { category: "AUTOMOBILES", subCategory: "Sales (Dealer & Repair)", rates: [{ rate: 50, unit: "1000 sq. ft." }, { rate: 300, unit: "acre" }, { rate: 60, unit: "service stall" }], amPeak: 0.05, pmPeak: 0.08 },
+            { category: "AUTOMOBILES", subCategory: "Auto Repair Center", rates: [{ rate: 20, unit: "1000 sq. ft." }, { rate: 400, unit: "acre" }, { rate: 20, unit: "service stall" }], amPeak: 0.08, pmPeak: 0.11 },
+            { category: "AUTOMOBILES", subCategory: "Auto Parts Sales", rates: [{ rate: 60, unit: "1000 sq. ft." }], amPeak: 0.04, pmPeak: 0.10 },
+            { category: "AUTOMOBILES", subCategory: "Quick Lube", rates: [{ rate: 40, unit: "service stall" }], amPeak: 0.07, pmPeak: 0.10 },
+            { category: "AUTOMOBILES", subCategory: "Tire Store", rates: [{ rate: 25, unit: "1000 sq. ft." }, { rate: 30, unit: "service stall" }], amPeak: 0.07, pmPeak: 0.11 },
+            { category: "CEMETERY", subCategory: "", rates: [{ rate: 5, unit: "acre" }], amPeak: null, pmPeak: null },
+            { category: "CHURCH", subCategory: "(or Synagogue)", rates: [{ rate: 9, unit: "1000 sq. ft." }, { rate: 30, unit: "acre" }], amPeak: 0.05, pmPeak: 0.08 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Super Regional Shopping Center", rates: [{ rate: 35, unit: "1000 sq. ft." }, { rate: 400, unit: "acre" }], amPeak: 0.04, pmPeak: 0.10 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Regional Shopping Center", rates: [{ rate: 50, unit: "1000 sq. ft." }, { rate: 500, unit: "acre" }], amPeak: 0.04, pmPeak: 0.09 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Community Shopping Center", rates: [{ rate: 80, unit: "1000 sq. ft." }, { rate: 700, unit: "acre" }], amPeak: 0.04, pmPeak: 0.10 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Neighborhood Shopping Center", rates: [{ rate: 120, unit: "1000 sq. ft." }, { rate: 1200, unit: "acre" }], amPeak: 0.04, pmPeak: 0.10 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Specialty Retail/Strip Commercial", rates: [{ rate: 40, unit: "1000 sq. ft." }, { rate: 400, unit: "acre" }], amPeak: 0.03, pmPeak: 0.09 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Electronics Superstore", rates: [{ rate: 50, unit: "1000 sq. ft." }], amPeak: null, pmPeak: 0.10 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Factory Outlet", rates: [{ rate: 40, unit: "1000 sq. ft." }], amPeak: 0.03, pmPeak: 0.09 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Supermarket", rates: [{ rate: 150, unit: "1000 sq. ft." }, { rate: 2000, unit: "acre" }], amPeak: 0.04, pmPeak: 0.10 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Drugstore", rates: [{ rate: 90, unit: "1000 sq. ft." }], amPeak: 0.04, pmPeak: 0.10 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Convenience Market (15-16 hours)", rates: [{ rate: 500, unit: "1000 sq. ft." }], amPeak: 0.08, pmPeak: 0.08 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Convenience Market (24 hours)", rates: [{ rate: 700, unit: "1000 sq. ft." }], amPeak: 0.09, pmPeak: 0.07 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Convenience Market (w/gasoline pumps)", rates: [{ rate: 850, unit: "1000 sq. ft." }, { rate: 550, unit: "vehicle fueling space" }], amPeak: 0.06, pmPeak: 0.07 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Discount Club", rates: [{ rate: 60, unit: "1000 sq. ft." }, { rate: 600, unit: "acre" }], amPeak: 0.01, pmPeak: 0.09 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Discount Store", rates: [{ rate: 60, unit: "1000 sq. ft." }, { rate: 600, unit: "acre" }], amPeak: 0.03, pmPeak: 0.08 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Furniture Store", rates: [{ rate: 6, unit: "1000 sq. ft." }, { rate: 100, unit: "acre" }], amPeak: 0.04, pmPeak: 0.09 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Lumber Store", rates: [{ rate: 30, unit: "1000 sq. ft." }, { rate: 150, unit: "acre" }], amPeak: 0.07, pmPeak: 0.09 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Home Improvement Superstore", rates: [{ rate: 40, unit: "1000 sq. ft." }], amPeak: 0.05, pmPeak: 0.08 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Hardware/Paint Store", rates: [{ rate: 60, unit: "1000 sq. ft." }, { rate: 600, unit: "acre" }], amPeak: 0.02, pmPeak: 0.09 },
+            { category: "COMMERCIAL/RETAIL", subCategory: "Garden Nursery", rates: [{ rate: 40, unit: "1000 sq. ft." }, { rate: 90, unit: "acre" }], amPeak: 0.03, pmPeak: 0.10 },
+            { category: "EDUCATION", subCategory: "University (4 years)", rates: [{ rate: 2.4, unit: "student" }, { rate: 100, unit: "acre" }], amPeak: 0.10, pmPeak: 0.09 },
+            { category: "EDUCATION", subCategory: "Junior College (2 years)", rates: [{ rate: 1.2, unit: "student" }, { rate: 24, unit: "1000 sq. ft." }, { rate: 120, unit: "acre" }], amPeak: 0.12, pmPeak: 0.09 },
+            { category: "EDUCATION", subCategory: "High School", rates: [{ rate: 1.3, unit: "student" }, { rate: 15, unit: "1000 sq. ft." }, { rate: 60, unit: "acre" }], amPeak: 0.20, pmPeak: 0.10 },
+            { category: "EDUCATION", subCategory: "Middle/Junior High", rates: [{ rate: 1.4, unit: "student" }, { rate: 12, unit: "1000 sq. ft." }, { rate: 50, unit: "acre" }], amPeak: 0.30, pmPeak: 0.09 },
+            { category: "EDUCATION", subCategory: "Elementary", rates: [{ rate: 1.6, unit: "student" }, { rate: 14, unit: "1000 sq. ft." }, { rate: 90, unit: "acre" }], amPeak: 0.32, pmPeak: 0.09 },
+            { category: "EDUCATION", subCategory: "Day Care", rates: [{ rate: 5, unit: "child" }, { rate: 80, unit: "1000 sq. ft." }], amPeak: 0.17, pmPeak: 0.18 },
+            { category: "FINANCIAL", subCategory: "Bank (Walk-In only)", rates: [{ rate: 150, unit: "1000 sq. ft." }, { rate: 1000, unit: "acre" }], amPeak: 0.04, pmPeak: 0.08 },
+            { category: "FINANCIAL", subCategory: "Bank w/Drive-Through", rates: [{ rate: 200, unit: "1000 sq. ft." }, { rate: 1500, unit: "acre" }], amPeak: 0.05, pmPeak: 0.10 },
+            { category: "FINANCIAL", subCategory: "Bank Drive-Through only", rates: [{ rate: 250, unit: "lane" }], amPeak: 0.03, pmPeak: 0.13 },
+            { category: "FINANCIAL", subCategory: "Savings & Loan", rates: [{ rate: 60, unit: "1000 sq. ft." }, { rate: 600, unit: "acre" }], amPeak: 0.02, pmPeak: 0.09 },
+            { category: "FINANCIAL", subCategory: "Savings & Loan Drive-Through only", rates: [{ rate: 100, unit: "lane" }], amPeak: 0.04, pmPeak: 0.15 },
+            { category: "HOSPITAL", subCategory: "General", rates: [{ rate: 20, unit: "bed" }, { rate: 25, unit: "1000 sq. ft." }, { rate: 250, unit: "acre" }], amPeak: 0.08, pmPeak: 0.10 },
+            { category: "HOSPITAL", subCategory: "Convalescent/Nursing", rates: [{ rate: 3, unit: "bed" }], amPeak: 0.07, pmPeak: 0.07 },
+            { category: "INDUSTRIAL", subCategory: "Industrial/Business Park", rates: [{ rate: 16, unit: "1000 sq. ft." }, { rate: 200, unit: "acre" }], amPeak: 0.12, pmPeak: 0.12 },
+            { category: "INDUSTRIAL", subCategory: "Industrial Park (no commercial)", rates: [{ rate: 8, unit: "1000 sq. ft." }, { rate: 90, unit: "acre" }], amPeak: 0.11, pmPeak: 0.12 },
+            { category: "INDUSTRIAL", subCategory: "Industrial Plant (multiple shifts)", rates: [{ rate: 10, unit: "1000 sq. ft." }, { rate: 120, unit: "acre" }], amPeak: 0.14, pmPeak: 0.15 },
+            { category: "INDUSTRIAL", subCategory: "Manufacturing/Assembly", rates: [{ rate: 4, unit: "1000 sq. ft." }, { rate: 50, unit: "acre" }], amPeak: 0.19, pmPeak: 0.20 },
+            { category: "INDUSTRIAL", subCategory: "Warehousing", rates: [{ rate: 5, unit: "1000 sq. ft." }, { rate: 60, unit: "acre" }], amPeak: 0.13, pmPeak: 0.15 },
+            { category: "INDUSTRIAL", subCategory: "Storage", rates: [{ rate: 2, unit: "1000 sq. ft." }, { rate: 0.2, unit: "vault" }, { rate: 30, unit: "acre" }], amPeak: 0.06, pmPeak: 0.09 },
+            { category: "INDUSTRIAL", subCategory: "Science Research & Development", rates: [{ rate: 8, unit: "1000 sq. ft." }, { rate: 80, unit: "acre" }], amPeak: 0.16, pmPeak: 0.14 },
+            { category: "INDUSTRIAL", subCategory: "Landfill & Recycling Center", rates: [{ rate: 6, unit: "acre" }], amPeak: 0.11, pmPeak: 0.10 },
+            { category: "LIBRARY", subCategory: "", rates: [{ rate: 50, unit: "1000 sq. ft." }, { rate: 400, unit: "acre" }], amPeak: 0.02, pmPeak: 0.10 },
+            { category: "LODGING", subCategory: "Hotel (w/convention facilities/restaurant)", rates: [{ rate: 10, unit: "occupied room" }, { rate: 300, unit: "acre" }], amPeak: 0.06, pmPeak: 0.08 },
+            { category: "LODGING", subCategory: "Motel", rates: [{ rate: 9, unit: "occupied room" }, { rate: 200, unit: "acre" }], amPeak: 0.08, pmPeak: 0.09 },
+            { category: "LODGING", subCategory: "Resort Hotel", rates: [{ rate: 8, unit: "occupied room" }, { rate: 100, unit: "acre" }], amPeak: 0.05, pmPeak: 0.07 },
+            { category: "LODGING", subCategory: "Business Hotel", rates: [{ rate: 7, unit: "occupied room" }], amPeak: 0.08, pmPeak: 0.09 },
+            { category: "MILITARY", subCategory: "", rates: [{ rate: 2.5, unit: "military & civilian personnel" }], amPeak: 0.09, pmPeak: 0.10 },
+            { category: "OFFICE", subCategory: "Standard Commercial Office", rates: [{ rate: 20, unit: "1000 sq. ft." }, { rate: 300, unit: "acre" }], amPeak: 0.14, pmPeak: 0.13 },
+            { category: "OFFICE", subCategory: "Large (High-Rise) Commercial Office", rates: [{ rate: 17, unit: "1000 sq. ft." }, { rate: 600, unit: "acre" }], amPeak: 0.13, pmPeak: 0.14 },
+            { category: "OFFICE", subCategory: "Office Park (400,000+ sq. ft.)", rates: [{ rate: 12, unit: "1000 sq.ft." }, { rate: 200, unit: "acre" }], amPeak: 0.13, pmPeak: 0.13 },
+            { category: "OFFICE", subCategory: "Single Tenant Office", rates: [{ rate: 14, unit: "1000 sq. ft." }, { rate: 180, unit: "acre" }], amPeak: 0.15, pmPeak: 0.15 },
+            { category: "OFFICE", subCategory: "Corporate Headquarters", rates: [{ rate: 7, unit: "1000 sq. ft." }, { rate: 110, unit: "acre" }], amPeak: 0.17, pmPeak: 0.16 },
+            { category: "OFFICE", subCategory: "Government (Post Office Central/Walk-In Only)", rates: [{ rate: 90, unit: "1000 sq. ft." }], amPeak: 0.05, pmPeak: 0.07 },
+            { category: "OFFICE", subCategory: "Community Post Office (no mail drop)", rates: [{ rate: 200, unit: "1000 sq. ft." }, { rate: 1300, unit: "acre" }], amPeak: 0.06, pmPeak: 0.09 },
+            { category: "OFFICE", subCategory: "Community Post Office (w/mail drop)", rates: [{ rate: 300, unit: "1000 sq. ft." }, { rate: 2000, unit: "acre" }], amPeak: 0.07, pmPeak: 0.10 },
+            { category: "OFFICE", subCategory: "Mail Drop Lane only", rates: [{ rate: 1500, unit: "lane" }], amPeak: 0.07, pmPeak: 0.12 },
+            { category: "OFFICE", subCategory: "Department of Motor Vehicles", rates: [{ rate: 180, unit: "1000 sq. ft." }, { rate: 900, unit: "acre" }], amPeak: 0.06, pmPeak: 0.10 },
+            { category: "OFFICE", subCategory: "Medical-Dental", rates: [{ rate: 50, unit: "1000 sq. ft." }, { rate: 500, unit: "acre" }], amPeak: 0.06, pmPeak: 0.11 },
+            { category: "PARKS", subCategory: "City/Regional (developed)", rates: [{ rate: 50, unit: "acre" }, { rate: 20, unit: "acre" }], amPeak: 0.13, pmPeak: 0.09 },
+            { category: "PARKS", subCategory: "Neighborhood/County (undeveloped)", rates: [{ rate: 5, unit: "acre" }, { rate: 6, unit: "picnic site" }], amPeak: null, pmPeak: 0.06 },
+            { category: "RECREATION", subCategory: "Bowling Center", rates: [{ rate: 30, unit: "1000 sq. ft." }, { rate: 300, unit: "acre" }, { rate: 30, unit: "lane" }], amPeak: 0.07, pmPeak: 0.11 },
+            { category: "RECREATION", subCategory: "Campground", rates: [{ rate: 4, unit: "campsite" }], amPeak: 0.04, pmPeak: 0.08 },
+            { category: "RECREATION", subCategory: "Golf Course", rates: [{ rate: 7, unit: "acre" }, { rate: 40, unit: "hole" }, { rate: 700, unit: "course" }], amPeak: 0.07, pmPeak: 0.09 },
+            { category: "RECREATION", subCategory: "Driving Range only", rates: [{ rate: 70, unit: "acre" }, { rate: 14, unit: "tee box" }], amPeak: 0.03, pmPeak: 0.09 },
+            { category: "RECREATION", subCategory: "Marinas", rates: [{ rate: 4, unit: "berth" }, { rate: 20, unit: "acre" }], amPeak: 0.03, pmPeak: 0.07 },
+            { category: "RECREATION", subCategory: "Multi-purpose Rec", rates: [{ rate: 90, unit: "acre" }], amPeak: 0.02, pmPeak: 0.06 },
+            { category: "RECREATION", subCategory: "Racquetball/Health Club", rates: [{ rate: 30, unit: "1000 sq. ft." }, { rate: 300, unit: "acre" }, { rate: 40, unit: "court" }], amPeak: 0.04, pmPeak: 0.09 },
+            { category: "RECREATION", subCategory: "Theaters (multiplex)", rates: [{ rate: 80, unit: "1000 sq. ft." }, { rate: 1.8, unit: "seat" }, { rate: 360, unit: "screen" }], amPeak: 0.0033, pmPeak: 0.08 },
+            { category: "RESIDENTIAL", subCategory: "Estate, Urban or Rural", rates: [{ rate: 12, unit: "dwelling unit" }], amPeak: 0.08, pmPeak: 0.10 },
+            { category: "RESIDENTIAL", subCategory: "Single Family Detached", rates: [{ rate: 10, unit: "dwelling unit" }], amPeak: 0.08, pmPeak: 0.10 },
+            { category: "RESIDENTIAL", subCategory: "Condominium", rates: [{ rate: 8, unit: "dwelling unit" }], amPeak: 0.08, pmPeak: 0.10 },
+            { category: "RESIDENTIAL", subCategory: "Apartment", rates: [{ rate: 6, unit: "dwelling unit" }], amPeak: 0.08, pmPeak: 0.09 },
+            { category: "RESIDENTIAL", subCategory: "Military Housing (off-base, <6 DU/acre)", rates: [{ rate: 8, unit: "dwelling unit" }], amPeak: 0.07, pmPeak: 0.09 },
+            { category: "RESIDENTIAL", subCategory: "Military Housing (off-base, 6-20 DU/acre)", rates: [{ rate: 6, unit: "dwelling unit" }], amPeak: 0.07, pmPeak: 0.09 },
+            { category: "RESIDENTIAL", subCategory: "Mobile Home (Family)", rates: [{ rate: 5, unit: "dwelling unit" }, { rate: 40, unit: "acre" }], amPeak: 0.08, pmPeak: 0.11 },
+            { category: "RESIDENTIAL", subCategory: "Mobile Home (Adults Only)", rates: [{ rate: 3, unit: "dwelling unit" }, { rate: 20, unit: "acre" }], amPeak: 0.09, pmPeak: 0.10 },
+            { category: "RESIDENTIAL", subCategory: "Retirement Community", rates: [{ rate: 4, unit: "dwelling unit" }], amPeak: 0.05, pmPeak: 0.07 },
+            { category: "RESIDENTIAL", subCategory: "Congregate Care Facility", rates: [{ rate: 2.5, unit: "dwelling unit" }], amPeak: 0.04, pmPeak: 0.08 },
+            { category: "RESTAURANTS", subCategory: "Quality", rates: [{ rate: 100, unit: "1000 sq. ft." }, { rate: 3, unit: "seat" }, { rate: 500, unit: "acre" }], amPeak: 0.01, pmPeak: 0.08 },
+            { category: "RESTAURANTS", subCategory: "Sit-down, high turnover", rates: [{ rate: 160, unit: "1000 sq. ft." }, { rate: 6, unit: "seat" }, { rate: 1000, unit: "acre" }], amPeak: 0.08, pmPeak: 0.08 },
+            { category: "RESTAURANTS", subCategory: "Fast Food (w/drive-through)", rates: [{ rate: 650, unit: "1000 sq. ft." }, { rate: 20, unit: "seat" }, { rate: 3000, unit: "acre" }], amPeak: 0.07, pmPeak: 0.07 },
+            { category: "RESTAURANTS", subCategory: "Fast Food (without drive-through)", rates: [{ rate: 700, unit: "1000 sq. ft." }], amPeak: 0.05, pmPeak: 0.07 },
+            { category: "RESTAURANTS", subCategory: "Delicatessen (7am-4pm)", rates: [{ rate: 150, unit: "1000 sq. ft." }, { rate: 11, unit: "seat" }], amPeak: 0.09, pmPeak: 0.03 },
+            { category: "TRANSPORTATION", subCategory: "Truck Terminal", rates: [{ rate: 10, unit: "1000 sq. ft." }, { rate: 7, unit: "bay" }, { rate: 80, unit: "acre" }], amPeak: 0.09, pmPeak: 0.08 },
+            { category: "TRANSPORTATION", subCategory: "Transit Station (Light Rail w/parking)", rates: [{ rate: 300, unit: "acre" }, { rate: 2.5, unit: "parking space" }], amPeak: 0.14, pmPeak: 0.15 },
+            { category: "TRANSPORTATION", subCategory: "Park & Ride Lots", rates: [{ rate: 400, unit: "acre" }, { rate: 5, unit: "parking space" }], amPeak: 0.14, pmPeak: 0.15 },
+        ];
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const landUseSelect = document.getElementById('landUse');
+            const unitSelect = document.getElementById('unit');
+            const sizeInput = document.getElementById('size');
+            const calculateBtn = document.getElementById('calculateBtn');
+            const resultsDiv = document.getElementById('results');
+            const dailyTripsP = document.getElementById('dailyTrips');
+            const amTripsP = document.getElementById('amTrips');
+            const pmTripsP = document.getElementById('pmTrips');
+            const errorMessageDiv = document.getElementById('errorMessage');
+
+            // --- Initialization ---
+            function populateLandUseDropdown() {
+                // Group by category for optgroups
+                const groupedData = tripData.reduce((acc, item) => {
+                    acc[item.category] = acc[item.category] || [];
+                    acc[item.category].push(item);
+                    return acc;
+                }, {});
+
+                Object.keys(groupedData).sort().forEach(category => { // Sort categories alphabetically
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = category;
+                    groupedData[category].forEach((item, index) => {
+                        const option = document.createElement('option');
+                        // Create a unique value to find the item later
+                        const uniqueValue = `${category}__${item.subCategory}`;
+                        option.value = uniqueValue;
+                        option.textContent = item.subCategory ? `${item.subCategory}` : `${item.category}`;
+                        optgroup.appendChild(option);
+                    });
+                    landUseSelect.appendChild(optgroup);
+                });
+
+                updateUnits();
+            }
+
+            // --- Event Handlers ---
+            function updateUnits() {
+                const selectedValue = landUseSelect.value;
+                const [category, subCategory] = selectedValue.split('__');
+
+                const selectedLandUse = tripData.find(item => item.category === category && item.subCategory === subCategory);
+
+                unitSelect.innerHTML = ''; // Clear previous options
+                if (selectedLandUse) {
+                    selectedLandUse.rates.forEach(rateInfo => {
+                        const option = document.createElement('option');
+                        option.value = rateInfo.unit;
+                        option.textContent = rateInfo.unit;
+                        unitSelect.appendChild(option);
+                    });
+                }
+            }
+            
+            function calculateTrips() {
+                const selectedValue = landUseSelect.value;
+                const [category, subCategory] = selectedValue.split('__');
+                const selectedUnit = unitSelect.value;
+                const size = parseFloat(sizeInput.value);
+
+                errorMessageDiv.textContent = '';
+                
+                if (isNaN(size) || size <= 0) {
+                    errorMessageDiv.textContent = 'Please enter a valid project size.';
+                    resultsDiv.classList.add('hidden');
+                    return;
+                }
+
+                const selectedLandUse = tripData.find(item => item.category === category && item.subCategory === subCategory);
+                const rateInfo = selectedLandUse.rates.find(r => r.unit === selectedUnit);
+
+                if (!selectedLandUse || !rateInfo) {
+                    errorMessageDiv.textContent = 'Could not find rate information for the selection.';
+                    resultsDiv.classList.add('hidden');
+                    return;
+                }
+
+                const dailyRate = rateInfo.rate;
+                const dailyTrips = dailyRate * size;
+                const amTrips = selectedLandUse.amPeak ? dailyTrips * selectedLandUse.amPeak : 'N/A';
+                const pmTrips = selectedLandUse.pmPeak ? dailyTrips * selectedLandUse.pmPeak : 'N/A';
+                
+                displayResults(dailyTrips, amTrips, pmTrips);
+            }
+
+            // --- UI Updates ---
+            function displayResults(daily, am, pm) {
+                dailyTripsP.textContent = Math.round(daily).toLocaleString();
+                amTripsP.textContent = am !== 'N/A' ? Math.round(am).toLocaleString() : 'N/A';
+                pmTripsP.textContent = pm !== 'N/A' ? Math.round(pm).toLocaleString() : 'N/A';
+                resultsDiv.classList.remove('hidden');
+            }
+
+            // --- Attach Event Listeners ---
+            landUseSelect.addEventListener('change', updateUnits);
+            calculateBtn.addEventListener('click', calculateTrips);
+
+            // --- Initial Load ---
+            populateLandUseDropdown();
+        });
+    </script>
+</body>
+</html>
